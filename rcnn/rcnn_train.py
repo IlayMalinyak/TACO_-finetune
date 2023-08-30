@@ -134,7 +134,8 @@ class Trainer(object):
     """
     @initializer
     def __init__(self, model, optimizer, criterion, metric, scheduler, train_dl, val_dl, device, optim_params, net_params, exp_num, log_path,
-                 exp_name,plot_every=None, max_iter=math.inf, nms_iou_thresh=0.7, max_norm=0, postprocessors=None,base_ds=None, output_dir=None, coco_evaluator=None):
+                 exp_name,plot_every=None, max_iter=math.inf, nms_iou_thresh=0.7, max_norm=0, postprocessors=None,base_ds=None, output_dir=None,
+                   coco_evaluator=None, validate=True):
         if log_path is not None:
             if  not os.path.exists(f'{self.log_path}'):
                 os.makedirs(f'{self.log_path}')
@@ -165,10 +166,15 @@ class Trainer(object):
             # self.logger.add_scalar('train_acc', t_acc, epoch)
             # train_acc.append(t_acc)
             # train_loss.extend(t_loss)
+            if self.validate:
+                v_stats = self.eval_epoch(device, epoch=epoch, plot=plot, max_iter=self.max_iter)
+                v_loss_mean = v_stats['loss']
+                v_acc = v_stats['mAP']
+            else:
+                v_stats = {}
+                v_loss_mean = np.nan
+                v_acc = np.nan
 
-            v_stats = self.eval_epoch(device, epoch=epoch, plot=plot, max_iter=self.max_iter)
-            v_loss_mean = v_stats['loss']
-            v_acc = v_stats['mAP']
             # self.logger.add_scalar('validation_acc', v_acc, epoch)
             # val_acc.append(v_acc)
             # val_loss.extend(v_loss)
@@ -180,26 +186,29 @@ class Trainer(object):
             if self.log_path and d_utils.is_main_process():
                 with (Path(f"{self.log_path}/log.txt")).open("a") as f:
                     f.write(json.dumps(log_stats) + "\n")
-
-            if self.scheduler is not None:
-                self.scheduler.step(v_loss_mean)
-            criterion = min_loss if best == 'loss' else best_acc
-            mult = 1 if best == 'loss' else -1
-            objective = v_loss_mean if best == 'loss' else v_acc
-            if mult*objective < mult*criterion:
-                print(f"saving model at {self.log_path}/checkpoint.pth")
-                if best == 'loss':
-                    min_loss = v_loss_mean
+            if self.validate:
+                if self.scheduler is not None:
+                    self.scheduler.step(v_loss_mean)
+                criterion = min_loss if best == 'loss' else best_acc
+                mult = 1 if best == 'loss' else -1
+                objective = v_loss_mean if best == 'loss' else v_acc
+                if mult*objective < mult*criterion:
+                    print(f"saving model at {self.log_path}/checkpoint.pth")
+                    if best == 'loss':
+                        min_loss = v_loss_mean
+                    else:
+                        best_acc = v_acc
+                    torch.save(self.model.state_dict(), f'{self.log_path}/checkpoint.pth')
+                    self.best_state_dict = self.model.state_dict()
+                    epochs_without_improvement = 0
                 else:
-                    best_acc = v_acc
+                    epochs_without_improvement += 1
+                    if epochs_without_improvement == early_stopping:
+                        print('early stopping!', flush=True)
+                        break
+            else:
                 torch.save(self.model.state_dict(), f'{self.log_path}/checkpoint.pth')
                 self.best_state_dict = self.model.state_dict()
-                epochs_without_improvement = 0
-            else:
-                epochs_without_improvement += 1
-                if epochs_without_improvement == early_stopping:
-                    print('early stopping!', flush=True)
-                    break
                 
             # self.logger.add_scalar('time', time.time() - start_time, epoch)
             print(f'****Epoch {epoch}: Train Loss: {t_loss_mean:.6f}, Val Loss: {v_loss_mean:.6f}, Train Acc: {0:.6f}, Val Acc: {v_acc:.6f}, Time: {time.time() - start_time:.2f}s****')

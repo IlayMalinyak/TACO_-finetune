@@ -32,9 +32,10 @@ if version.parse(torchvision.__version__) < version.parse('0.7'):
     from torchvision.ops.misc import _output_size
 
 
-detr_checkpoint = '/home/ilay.kamai/mini_project/project/detr/checkpoints/detr-r50_no-class-head.pth'
 # alpha_t_list = [0,1, 1, 1, 1, 1, 1, 1, 0.0005]
-alpha_t_list = [0,0.01, 0.36, 0.023, 0.05, 0.105, 1, 0.016, 0.0005] # train inverse frequencies normalized
+# alpha_t_list = [0,0.01, 0.36, 0.023, 0.05, 0.105, 1, 0.016] # train inverse frequencies normalized
+alpha_t_list = torch.tensor([0,0.7,1,0.8,1,1,1,1])
+
 
 
 def reduce_loss(loss, reduction='mean'):
@@ -70,7 +71,7 @@ class FocalLoss(nn.Module):
     """
 
     def __init__(self,
-                 alpha: Optional[Tensor] = None,
+                 alpha: Optional[Tensor] = alpha_t_list,
                  gamma: float = 2,
                  reduction: str = 'mean',
                  ignore_index: int = -100):
@@ -143,7 +144,7 @@ class FocalLoss(nn.Module):
         return loss    
 
 
-def custom_fastrcnn_loss(class_logits, box_regression, labels, regression_targets, custom_loss=LabelSmoothingCrossEntropy):
+def custom_fastrcnn_loss(class_logits, box_regression, labels, regression_targets, custom_loss=FocalLoss):
     """
     Computes the loss for Faster R-CNN.
 
@@ -253,9 +254,11 @@ def initializer(func):
 class Cfg():
     @initializer
     def __init__(self, lr=1e-3,lr_backbone=1e-5, batch_size=2,weight_decay=1e-4, epochs=300,lr_drop=200, clip_max_norm=0.1, dataset_file='custom', num_classes=8,
-                 frozen_weights=None, backbone='resnet50', dilation=True, position_embedding='sine', coco_path=None, output_dir=None, enc_layers=6, dec_layers=6, dim_feedforward=2048, hidden_dim=256, dropout=0.1, nheads=8, num_queries=100, pre_norm=False, masks=False, resume=detr_checkpoint,
+                 frozen_weights=None, backbone='resnet50', dilation=True, position_embedding='sine', coco_path=None, output_dir=None, enc_layers=6, dec_layers=6, dim_feedforward=2048,
+                hidden_dim=256, dropout=0.1, nheads=8, num_queries=100, pre_norm=False, masks=False, resume=None,
                  aux_loss=True, set_cost_class=5, set_cost_bbox=1, set_cost_giou=2, mask_loss_coef=1, dice_loss_coef=1, bbox_loss_coef=5, ce_loss_coef=1,
-                 giou_loss_coef=2,eos_coef=0.0005, device='cuda', num_workers=2, alpha_t=None, gamma=1.5, focal_loss=False, early_stopping=10, seed=42):
+                 giou_loss_coef=2,eos_coef=0.0005, device='cuda', num_workers=2, alpha_t=None, gamma=1.5, focal_loss=False, early_stopping=10, seed=42,
+                 validate=True):
         pass
 
 

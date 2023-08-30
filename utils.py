@@ -69,7 +69,7 @@ def anns_hist(file_path):
         cat_histogram[ann['category_id']-1] += 1
     
     # Initialize the matplotlib figure
-    f, ax = plt.subplots(figsize=(5,15))
+    f, ax = plt.subplots(figsize=(15,5))
     
     # Convert to DataFrame
     df = pd.DataFrame({'Categories': list(cls_names), 'Number of annotations': cat_histogram})
@@ -81,8 +81,8 @@ def anns_hist(file_path):
     # Plot the histogram
     # sns.set_color_codes("pastel")
     # sns.set(style="whitegrid")
-    plot_1 = sns.barplot(x="Number of annotations", y="Categories", data=df,
-                label="Total", color="b")
+    plot_1 = sns.barplot(y="Number of annotations", x="Categories", data=df,
+                label="Total", color="b", orient='v', order=df['Categories'])
     
     fig = plot_1.get_figure()
     plt.show()

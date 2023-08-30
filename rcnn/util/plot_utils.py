@@ -197,7 +197,7 @@ def plot_attention_map(images, outputs, conv_features, cls_names, save_path=None
             plt.show()
 
 
-def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col=0, log_name='log.txt'):
+def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col=0, log_name='log.txt', exp_names=None):
     '''
     Function to plot specific fields from training log(s). Plots both training and test results.
 
@@ -238,10 +238,11 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
 
     # load log file(s) and plot
     dfs = [pd.read_json(Path(p) / log_name, lines=True) for p in logs]
+    exp_names = ['']*len(dfs) if exp_names is None else exp_names
     
     fig, axs = plt.subplots(ncols=len(fields), figsize=(16, 5))
 
-    for df, color in zip(dfs, sns.color_palette(n_colors=len(logs))):
+    for df, color, name in zip(dfs, sns.color_palette(n_colors=len(logs)), exp_names):
         # for c in df.columns:
         #     print(c, df[c].dtype)
         # print(df.columns)
@@ -262,7 +263,7 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
                     ax=axs[j],
                     color=[color] * 2,
                     style=['-'],
-                    label=['validation mAP']
+                    label=[f'validation mAP {name}']
                 )
                 # ax.set_xticklabels(len(df[f'test_{field}']))
             else:
@@ -276,7 +277,7 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
                     ax=axs[j],
                     color=[color] * 2,
                     style=['-', '--'],
-                    label=['train', 'validation']
+                    label=[f'train {name}', f'validation {name}']
                 )
                 # ax.set_xticklabels(len(df[f'train_{field}']))
     for ax, field in zip(axs, fields):

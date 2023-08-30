@@ -197,7 +197,7 @@ def plot_attention_map(images, outputs, conv_features, cls_names, save_path=None
             plt.show()
 
 
-def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col=0, log_name='log.txt'):
+def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col=0, log_name='log.txt', train_test=True):
     '''
     Function to plot specific fields from training log(s). Plots both training and test results.
 
@@ -266,24 +266,46 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
                 )
                 # ax.set_xticklabels(len(df[f'test_{field}']))
             else:
-                try:
-                    df_no_coco = df.drop(columns=['test_coco_eval_bbox'])
-                except KeyError:
-                    print("no coco eval in log file")
-                    df_no_coco = df
-                ax = df_no_coco.interpolate().ewm(com=ewm_col).mean().plot(
-                    y=[f'train_{field}', f'test_{field}'],
-                    ax=axs[j],
-                    color=[color] * 2,
-                    style=['-', '--'],
-                    label=['train', 'validation']
-                )
+                if train_test:
+                    try:
+                        df_no_coco = df.drop(columns=['test_coco_eval_bbox'])
+                    except KeyError:
+                        print("no coco eval in log file")
+                        df_no_coco = df
+                    cur_ax = axs[j] if len(fields) > 1 else axs
+                    ax = df_no_coco.interpolate().ewm(com=ewm_col).mean().plot(
+                        y=[f'train_{field}', f'test_{field}'],
+                        ax=cur_ax,
+                        color=[color] * 2,
+                        style=['-', '--'],
+                        label=['train', 'validation']
+                    )
+                else:
+                    try:
+                        df_no_coco = df.drop(columns=['test_coco_eval_bbox'])
+                    except KeyError:
+                        print("no coco eval in log file")
+                        df_no_coco = df
+                    cur_ax = axs[j] if len(fields) > 1 else axs
+                    ax = df_no_coco.interpolate().ewm(com=ewm_col).mean().plot(
+                        y=[f'train_{field}'],
+                        ax=cur_ax,
+                        color=[color],
+                        style=['-'],
+                        label=['train']
+                    )
+
                 # ax.set_xticklabels(len(df[f'train_{field}']))
-    for ax, field in zip(axs, fields):
-        # ax.legend([Path(p).name for p in logs])
-        ax.legend()
-        ax.set_title(field)
-        ax.set_xlabel('Epoch')
+    if len(fields) > 1:
+        for ax, field in zip(axs, fields):
+            # ax.legend([Path(p).name for p in logs])
+            ax.legend()
+            ax.set_title(field)
+            ax.set_xlabel('Epoch')
+    else:
+        axs.legend()
+        axs.set_title(fields[0])
+        axs.set_xlabel('Epoch')
 
 
 def plot_precision_recall(files, naming_scheme='iter'):

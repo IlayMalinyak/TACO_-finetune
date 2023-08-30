@@ -1,0 +1,20 @@
+path: /home/yanay.soker/mini_project/data
+train: 
+    - "train/images"
+    - "train/labels"
+val: 
+    - "val/images"
+    - "val/labels"
+test: 
+    - "test/images"
+    - "test/labels"
+
+nc: 7
+names: 
+   0: 'metals_and_plastic' 
+   1: 'other' 
+   2: 'non_recyclable'
+   3: 'glass'
+   4: 'paper'
+   5: 'bio'
+   6: 'unknown'

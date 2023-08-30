@@ -107,6 +107,7 @@ def get_args_parser():
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
     parser.add_argument('--num_workers', default=2, type=int)
+    parser.add_argument('--validate', default=True, type=bool)
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -153,8 +154,8 @@ def main(args):
                                   weight_decay=args.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
 
-    dataset_train = build_dataset(image_set='train_full', args=args)
-    dataset_val = build_dataset(image_set='test', args=args)
+    dataset_train = build_dataset(image_set='train', args=args)
+    dataset_val = build_dataset(image_set='val', args=args)
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)
@@ -222,9 +223,15 @@ def main(args):
             args.clip_max_norm)
         lr_scheduler.step()
 
-        test_stats, coco_evaluator = evaluate(
-            model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
-        )
+        if args.validate:
+            test_stats, coco_evaluator = evaluate(
+                model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
+            )
+        else:
+            print('no validation')
+            test_stats = {}
+            coco_evaluator = None
+
         
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                      **{f'test_{k}': v for k, v in test_stats.items()},
@@ -236,7 +243,7 @@ def main(args):
                 f.write(json.dumps(log_stats) + "\n")
 
             # for evaluation logs
-            if coco_evaluator is not None:
+            if coco_evaluator is not None and args.validate:
                 (output_dir / 'eval').mkdir(exist_ok=True)
                 if "bbox" in coco_evaluator.coco_eval:
                     filenames = ['latest.pth']
@@ -245,32 +252,33 @@ def main(args):
                     for name in filenames:
                         torch.save(coco_evaluator.coco_eval["bbox"].eval,
                                    output_dir / "eval" / name)
-                        
-        test_loss = test_stats['loss']
-        test_acc = test_stats['mAP']
-        # if test_loss < best_loss:
-        if test_acc > best_acc:
-            no_improvement = 0
-            # best_loss = test_loss
-            best_acc = test_acc
-            checkpoint_paths = [output_dir / 'checkpoint.pth']
-            # extra checkpoint before LR drop and every 100 epochs
-            if (epoch + 1) % args.lr_drop == 0 or (epoch + 1) % 100 == 0:
-                checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
-            for checkpoint_path in checkpoint_paths:
-                utils.save_on_master({
-                'model': model_without_ddp.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'lr_scheduler': lr_scheduler.state_dict(),
-                'epoch': epoch,
-                'args': args,
-                }, checkpoint_path)
-            print('best model saved')
-        else:
-            no_improvement += 1
-            if no_improvement == 10:
-                print('early stopping')
-                break
+
+        if args.validate:          
+            test_loss = test_stats['loss']
+            test_acc = test_stats['mAP']
+            # if test_loss < best_loss:
+            if test_acc > best_acc:
+                no_improvement = 0
+                # best_loss = test_loss
+                best_acc = test_acc
+                checkpoint_paths = [output_dir / 'checkpoint.pth']
+                # extra checkpoint before LR drop and every 100 epochs
+                if (epoch + 1) % args.lr_drop == 0 or (epoch + 1) % 100 == 0:
+                    checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
+                for checkpoint_path in checkpoint_paths:
+                    utils.save_on_master({
+                    'model': model_without_ddp.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),
+                    'epoch': epoch,
+                    'args': args,
+                    }, checkpoint_path)
+                print('best model saved')
+            else:
+                no_improvement += 1
+                if no_improvement == args.early_stopping:
+                    print('early stopping')
+                    break
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
