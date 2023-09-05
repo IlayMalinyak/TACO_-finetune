@@ -59,8 +59,10 @@ than create a yaml file and simply call:
 ```python
 from ultralytics import YOLO
 model = YOLO("yolov8l.yaml")
-model.train(data = 'datasets.yaml', epochs=120,patience=10, imgsz=864, batch=4)
+model.train(data = <path_to_yaml>, epochs=<number_of_epochs>, batch=<batch_size>)
 ```
+list of all possible arguments can be found here:
+https://docs.ultralytics.com/modes/train/#arguments
 
 an example can be seen in the yolo folder.
 
